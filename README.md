@@ -1,6 +1,6 @@
 # Profilr
 
-**Verified professional credentials on Shelby Protocol — powered by GenLayer AI consensus.**
+**Verified professional credentials on Shelby Protocol, powered by GenLayer AI consensus.**
 
 > Testnet build · Shelby Protocol + GenLayer + Aptos
 
@@ -8,7 +8,7 @@
 
 ## What is Profilr?
 
-Profilr lets professionals store their credentials (education, work history, certifications, projects) as immutable blobs on **Shelby Protocol**. **GenLayer AI validators** verify every credential against public sources. Users share a single link — and choose whether viewing their full verified profile is free or paid.
+Profilr lets professionals store their credentials (education, work history, certifications, projects) as immutable blobs on **Shelby Protocol**. **GenLayer AI validators** verify every credential against public sources. Users share a single link and choose whether viewing their full verified profile is free or paid.
 
 Companies pay **USDC on Aptos** for 7-day access windows. The profile owner earns **70%** of every payment. Access is enforced by a GenLayer Intelligent Contract and recorded permanently on Shelby.
 
