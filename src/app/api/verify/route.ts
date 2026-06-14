@@ -1,8 +1,26 @@
 import { NextResponse }    from 'next/server'
-import { shelby }          from '@/lib/shelby'
 import { genLayer }        from '@/lib/genlayer'
-import { profileRegistry } from '../profile/save/route'
-import type { ProfilrProfile, Credential } from '@/types'
+import { getProfile, saveProfile } from '@/lib/db'
+import type { Credential } from '@/types'
+
+async function downloadFromShelby(blobId: string): Promise<Credential | null> {
+  const apiKey = process.env.SHELBY_API_KEY
+  const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
+
+  if (!apiKey || apiKey === 'your_shelby_api_key_here') {
+    return null
+  }
+
+  try {
+    const res = await fetch(`${apiUrl}/v1/blobs/${blobId}`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -11,33 +29,52 @@ export async function POST(req: Request) {
     if (!credentialId || !blobId)
       return NextResponse.json({ error: 'credentialId and blobId required' }, { status: 400 })
 
-    // Fetch credential from Shelby
-    const credential = await shelby.downloadJson<Credential>(blobId)
-
     // Submit to GenLayer for AI verification
-    const txHash = await genLayer.verifyCredential({
-      credentialBlobId: blobId,
-      type:             credential.type,
-      title:            credential.title,
-      institution:      credential.institution,
-      ownerWallet:      walletAddress ?? '',
-    })
+    let txHash: unknown = null
+    try {
+      const credential = await downloadFromShelby(blobId)
+      if (credential) {
+        txHash = await genLayer.verifyCredential({
+          credentialBlobId: blobId,
+          type:             credential.type,
+          title:            credential.title,
+          institution:      credential.institution,
+          ownerWallet:      walletAddress ?? '',
+        })
+      }
+    } catch (e) {
+      console.warn('[verify] GenLayer not configured:', e)
+    }
 
-    // Update credential status to 'reviewing'
-    credential.verificationStatus = 'reviewing'
-    const { blobId: newBlobId } = await shelby.uploadJson(credential)
-
-    // Update profile
+    // Update credential status to reviewing in the profile
     if (walletAddress) {
-      const profileBlobId = profileRegistry.get(walletAddress)
-      if (profileBlobId) {
-        const profile = await shelby.downloadJson<ProfilrProfile>(profileBlobId)
+      const profile = await getProfile(walletAddress)
+      if (profile) {
         const idx = profile.credentials.findIndex(c => c.id === credentialId)
         if (idx >= 0) {
           profile.credentials[idx].verificationStatus = 'reviewing'
-          profile.credentials[idx].blobId = newBlobId
-          const { blobId: newProfileBlobId } = await shelby.uploadJson(profile)
-          profileRegistry.set(walletAddress, newProfileBlobId)
+          profile.updatedAt = Date.now()
+
+          // Upload updated profile
+          const apiKey = process.env.SHELBY_API_KEY
+          const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
+          let newBlobId = profile.profileBlobId
+
+          if (apiKey && apiKey !== 'your_shelby_api_key_here') {
+            try {
+              const res = await fetch(`${apiUrl}/v1/blobs`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(profile),
+              })
+              if (res.ok) {
+                const j = await res.json()
+                newBlobId = j.blob_id ?? j.id
+              }
+            } catch {}
+          }
+
+          await saveProfile(walletAddress, profile, newBlobId)
         }
       }
     }
@@ -49,7 +86,6 @@ export async function POST(req: Request) {
   }
 }
 
-// Poll for verdict (called by frontend or cron)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
