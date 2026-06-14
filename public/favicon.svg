@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+  <rect x="0" y="0" width="150" height="150" rx="26" fill="#E91E8C"/>
+  <text x="5" y="142" font-size="138" font-family="Georgia,'Times New Roman',serif" font-weight="700" fill="white">P</text>
+  <circle cx="70" cy="68" r="20" fill="white"/>
+  <circle cx="70" cy="68" r="11" fill="#E91E8C"/>
+  <circle cx="70" cy="74" r="5" fill="white"/>
+  <circle cx="108" cy="68" r="9" fill="white"/>
+  <circle cx="108" cy="68" r="4.5" fill="#E91E8C"/>
+  <circle cx="110" cy="66" r="1.8" fill="white"/>
+</svg>

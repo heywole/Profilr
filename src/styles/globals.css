@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Variables ── */
+@layer base {
+  :root {
+    --bg:           #FAF7F2;
+    --bg-panel:     #FFFFFF;
+    --bg-subtle:    #F0EDE6;
+    --bg-muted:     #F5F2ED;
+    --border:       #E8E0D8;
+    --border-light: #EDE8E1;
+    --text:         #1A1A1A;
+    --text-sub:     #6B6B6B;
+    --text-dim:     #9E9E9E;
+    --accent:       #E91E8C;
+    --accent-light: #F48FB1;
+    --accent-pale:  #FCE4EC;
+    --accent-dark:  #C2185B;
+  }
+  .dark {
+    --bg:           #0F0E0C;
+    --bg-panel:     #1A1916;
+    --bg-subtle:    #201E1A;
+    --bg-muted:     #252219;
+    --border:       #2C2923;
+    --border-light: #332F28;
+    --text:         #F5F0E8;
+    --text-sub:     #9E9880;
+    --text-dim:     #6B6655;
+    --accent:       #F06292;
+    --accent-light: #F48FB1;
+    --accent-pale:  #1A0A0F;
+    --accent-dark:  #E91E8C;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg-subtle); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-light); }
+
+  ::selection {
+    background: rgba(233, 30, 140, 0.15);
+    color: var(--text);
+  }
+}
+
+@layer components {
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+  }
+
+  .card-hover {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 0 0 1px rgba(233,30,140,0.1);
+    border-color: rgba(244,143,177,0.4);
+  }
+
+  .panel-modal {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl;
+    @apply text-sm font-semibold text-white;
+    @apply active:scale-95 transition-all duration-150;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    background: var(--accent);
+    box-shadow: 0 2px 12px rgba(233,30,140,0.12);
+  }
+  .btn-primary:hover {
+    background: var(--accent-dark);
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl;
+    @apply text-sm font-semibold;
+    @apply active:scale-95 transition-all duration-150;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+  }
+  .btn-outline:hover {
+    background: var(--accent-pale);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm;
+    @apply transition-all duration-150;
+    color: var(--text-sub);
+  }
+  .btn-ghost:hover {
+    color: var(--text);
+    background: var(--bg-subtle);
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-9 h-9 rounded-xl;
+    @apply transition-all duration-150;
+    color: var(--text-sub);
+  }
+  .btn-icon:hover {
+    color: var(--text);
+    background: var(--bg-subtle);
+  }
+
+  /* ── Input ── */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl text-sm;
+    @apply transition-all duration-150;
+    @apply outline-none;
+    background: var(--bg-muted);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .input::placeholder {
+    color: var(--text-dim);
+  }
+  .input:focus {
+    border-color: rgba(233,30,140,0.5);
+    box-shadow: 0 0 0 3px rgba(233,30,140,0.1);
+  }
+
+  /* ── Badges ── */
+  .badge-verified {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  .dark .badge-verified {
+    @apply bg-emerald-950/30 text-emerald-400 border-emerald-800/40;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply bg-amber-50 text-amber-700 border border-amber-200;
+  }
+
+  .badge-failed {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply bg-red-50 text-red-600 border border-red-200;
+  }
+
+  .badge-pink {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: var(--accent-pale);
+    color: var(--accent);
+    border: 1px solid rgba(233,30,140,0.2);
+  }
+
+  /* ── Label ── */
+  .label {
+    @apply text-xs font-semibold uppercase tracking-widest;
+    color: var(--text-dim);
+  }
+
+  /* ── Nav link ── */
+  .nav-link {
+    @apply text-sm font-medium transition-colors duration-150 relative;
+    color: var(--text-sub);
+  }
+  .nav-link::after {
+    content: '';
+    @apply absolute bottom-[-2px] left-0 w-0 h-[2px] transition-all duration-200;
+    background: var(--accent);
+  }
+  .nav-link:hover {
+    color: var(--text);
+  }
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+  .nav-link-active {
+    color: var(--accent);
+  }
+  .nav-link-active::after {
+    @apply w-full;
+  }
+
+  /* ── Stat number ── */
+  .stat-num {
+    @apply text-3xl font-bold tracking-tight;
+    color: var(--text);
+  }
+
+  /* ── Ticker ── */
+  .ticker-track {
+    @apply flex gap-8 whitespace-nowrap;
+    width: max-content;
+  }
+}
+
+/* ── Stagger animation ── */
+.stagger > * {
+  animation: fadeUp 0.5s ease forwards;
+  opacity: 0;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger > *:nth-child(4) { animation-delay: 0.20s; }
+.stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger > *:nth-child(6) { animation-delay: 0.30s; }
+.stagger > *:nth-child(7) { animation-delay: 0.35s; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
