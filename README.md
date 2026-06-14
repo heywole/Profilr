@@ -28,51 +28,7 @@ Companies pay **USDC on Aptos** for 7-day access windows. The profile owner earn
 
 ---
 
-## Getting Started
 
-### 1. Clone and install
-
-```bash
-git clone https://github.com/YOUR_USERNAME/profilr
-cd profilr
-npm install
-```
-
-### 2. Set up environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Fill in:
-- `SHELBY_API_KEY` — get from [developers.shelby.xyz](https://developers.shelby.xyz)
-- `GENLAYER_CONTRACT_ADDRESS` — deploy the contract first (see below)
-- `JWT_SECRET` — any random 32-char string
-
-### 3. Deploy the GenLayer contract
-
-```bash
-# Install GenLayer CLI
-npm install -g genlayer
-
-# Initialize
-genlayer init
-
-# Deploy the Profilr contract
-genlayer deploy contracts/profilr.py
-
-# Copy the contract address to .env.local
-```
-
-### 4. Run the development server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
----
 
 ## Project Structure
 
@@ -134,69 +90,11 @@ Every paid access payment splits automatically:
 - [Martian](https://martianwallet.xyz)
 
 ---
-
-## Daily Dev Log
-
-Follow the build in public. Every day's progress, bugs, and features posted on [Twitter/X](https://twitter.com).
-
----
-
 ## License
 
 MIT
 
 ---
 
-## Database — Upstash Redis
 
-Profilr uses **Upstash Redis** for persistent storage of:
-- Profile wallet → Shelby blob ID index
-- Credential IDs
-- Access records
-- Banned/flagged wallets
-- Platform stats
-
-**Setup (free):**
-1. Go to [upstash.com](https://upstash.com) — create a free account
-2. Create a Redis database
-3. Copy REST URL and REST Token into `.env.local`
-
----
-
-## Admin Panel
-
-Access the admin panel at `/admin` — only the wallet address in `NEXT_PUBLIC_ADMIN_WALLET` can enter. Anyone else gets redirected to home instantly.
-
-**Admin can:**
-- See all profiles, credentials, payments in real time
-- View platform earnings (your 20% cut per payment)
-- Flag or ban wallet addresses
-- Unban wallets
-- Search and filter everything
-
-**To set your admin wallet:**
-Add your Aptos wallet address to `.env.local`:
-```
-NEXT_PUBLIC_ADMIN_WALLET=0xYOUR_WALLET_ADDRESS_HERE
-```
-
-Keep this secret. Do not share your wallet address publicly if you want the admin panel to stay private.
-
----
-
-## Deployment (Vercel)
-
-```bash
-# Push to GitHub first
-git init
-git add .
-git commit -m "initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/profilr
-git push -u origin main
-```
-
-Then:
-1. Go to [vercel.com](https://vercel.com) and import the repo
-2. Add all env vars from `.env.example`
-3. Deploy
 
