@@ -8,21 +8,24 @@ import toast from 'react-hot-toast'
 interface Props { credential: Credential; readOnly?: boolean; onRefresh?: () => void }
 
 export function CredentialCard({ credential, readOnly, onRefresh }: Props) {
-  const [open, setOpen]         = useState(false)
-  const [verifying, setVerify]  = useState(false)
+  const [open, setOpen]        = useState(false)
+  const [verifying, setVerify] = useState(false)
 
   const requestVerification = async () => {
     setVerify(true)
     try {
       const res = await fetch('/api/verify', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credentialId: credential.id, blobId: credential.blobId }),
       })
       if (!res.ok) throw new Error()
       toast.success('Submitted to GenLayer validators')
       onRefresh?.()
-    } catch { toast.error('Failed to submit') }
-    finally { setVerify(false) }
+    } catch {
+      toast.error('Failed to submit')
+    } finally {
+      setVerify(false) }
   }
 
   const statusBadge = () => {
@@ -33,56 +36,98 @@ export function CredentialCard({ credential, readOnly, onRefresh }: Props) {
     return <span className="badge-failed"><AlertCircle size={11}/>Failed</span>
   }
 
+  // Fixed: typed rows array to avoid TS null issue
+  const shelbyRows: [string, string][] = [
+    ['Blob ID', credential.blobId || 'Pending upload'],
+    ['Merkle root', credential.merkleRoot ? credential.merkleRoot.slice(0, 24) + '…' : '—'],
+  ]
+  if (credential.verifiedAt) {
+    shelbyRows.push(['Verified', timeAgo(credential.verifiedAt)])
+  }
+
   return (
-    <div className="card overflow-hidden transition-all duration-200 hover:shadow-card-hover hover:border-[var(--accent-light)]/30">
+    <div className="card overflow-hidden transition-all duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
+      style={{ borderColor: open ? 'rgba(233,30,140,0.2)' : 'var(--border)' }}>
+
       <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={() => setOpen(v => !v)}>
-        <div className="w-9 h-9 rounded-xl bg-[var(--bg-subtle)] flex items-center justify-center text-base flex-shrink-0">{credEmoji(credential.type)}</div>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
+          style={{ background: 'var(--bg-subtle)' }}>
+          {credEmoji(credential.type)}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
-              <p className="text-sm font-semibold text-[var(--text)] truncate">{credential.title}</p>
-              <p className="text-xs text-[var(--text-sub)] mt-0.5">{credential.institution}</p>
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{credential.title}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-sub)' }}>{credential.institution}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {statusBadge()}
-              {open ? <ChevronUp size={13} className="text-[var(--text-dim)]"/> : <ChevronDown size={13} className="text-[var(--text-dim)]"/>}
+              {open
+                ? <ChevronUp size={13} style={{ color: 'var(--text-dim)' }}/>
+                : <ChevronDown size={13} style={{ color: 'var(--text-dim)' }}/>
+              }
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-1.5 text-xs text-[var(--text-dim)]">
+          <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--text-dim)' }}>
             <span>{credLabel(credential.type)}</span>
             <span>·</span>
-            <span>{fmtDate(credential.startDate)}{credential.endDate ? ` — ${fmtDate(credential.endDate)}` : credential.current ? ' — Present' : ''}</span>
+            <span>
+              {fmtDate(credential.startDate)}
+              {credential.endDate
+                ? ` — ${fmtDate(credential.endDate)}`
+                : credential.current ? ' — Present' : ''
+              }
+            </span>
           </div>
         </div>
       </div>
 
       {open && (
-        <div className="border-t border-[var(--border)] px-4 py-4 space-y-4 animate-fade-in bg-[var(--bg-subtle)]/40">
-          {credential.description && <p className="text-sm text-[var(--text-sub)] leading-relaxed">{credential.description}</p>}
-          <div className="bg-[var(--bg-panel)] rounded-xl p-3 border border-[var(--border)] space-y-2">
-            <p className="label">Shelby storage</p>
-            {[
-              ['Blob ID', credential.blobId || 'Pending upload'],
-              ['Merkle root', credential.merkleRoot ? credential.merkleRoot.slice(0,24)+'…' : '—'],
-              credential.verifiedAt ? ['Verified', timeAgo(credential.verifiedAt)] : null,
-            ].filter(Boolean).map(([k,v]) => (
-              <div key={k as string} className="flex justify-between text-xs">
-                <span className="text-[var(--text-dim)]">{k}</span>
-                <span className="font-mono text-[var(--text-sub)] truncate max-w-[180px]">{v}</span>
+        <div className="border-t px-4 py-4 space-y-4"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-subtle)', animation: 'fadeIn 0.2s ease' }}>
+
+          {credential.description && (
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-sub)' }}>
+              {credential.description}
+            </p>
+          )}
+
+          {/* Shelby storage info */}
+          <div className="rounded-xl p-3 border space-y-2"
+            style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-dim)' }}>
+              Shelby storage
+            </p>
+            {shelbyRows.map(([k, v]) => (
+              <div key={k} className="flex justify-between text-xs">
+                <span style={{ color: 'var(--text-dim)' }}>{k}</span>
+                <span className="font-mono truncate max-w-[180px]" style={{ color: 'var(--text-sub)' }}>{v}</span>
               </div>
             ))}
           </div>
+
+          {/* GenLayer verdict */}
           {credential.verificationReason && (
-            <div className="bg-[var(--accent-pale)] rounded-xl p-3 border border-[var(--accent)]/10">
-              <p className="label text-[var(--accent)] mb-1">GenLayer verdict</p>
-              <p className="text-xs text-[var(--text-sub)] leading-relaxed">{credential.verificationReason}</p>
+            <div className="rounded-xl p-3 border"
+              style={{ background: 'var(--accent-pale)', borderColor: 'rgba(233,30,140,0.1)' }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--accent)' }}>
+                GenLayer verdict
+              </p>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-sub)' }}>
+                {credential.verificationReason}
+              </p>
             </div>
           )}
+
+          {/* Actions */}
           {!readOnly && (
             <div className="flex items-center gap-2 flex-wrap">
               {credential.verificationStatus === 'pending' && (
                 <button onClick={requestVerification} disabled={verifying} className="btn-primary text-xs h-8 px-4">
-                  {verifying ? 'Submitting…' : <><ShieldCheck size={12}/>Verify with GenLayer</>}
+                  {verifying
+                    ? 'Submitting…'
+                    : <><ShieldCheck size={12}/>Verify with GenLayer</>
+                  }
                 </button>
               )}
               {credential.verificationStatus === 'failed' && (
