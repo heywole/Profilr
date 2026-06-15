@@ -1,9 +1,11 @@
 import type { ProfilrProfile, Credential, AccessRecord } from '@/types'
 
 // ── Safe Redis with in-memory fallback when Upstash not configured ──
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let redis: any = null
 
-async function getRedis() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getRedis(): Promise<any> {
   if (redis) return redis
   const url   = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -15,9 +17,9 @@ async function getRedis() {
   return null
 }
 
-// ── In-memory fallback (works without Redis — data clears on restart) ──
+// ── In-memory fallback ──
 const mem = {
-  profiles:    new Map<string, string>(),    // wallet -> blobId
+  profiles:    new Map<string, string>(),
   profileData: new Map<string, ProfilrProfile>(),
   credentials: new Map<string, Credential & { ownerWallet: string }>(),
   access:      new Map<string, Array<AccessRecord & { ownerWallet: string; profileBlobId: string }>>(),
@@ -43,7 +45,7 @@ export async function getProfileBlobId(wallet: string): Promise<string | null> {
   if (mem.profiles.has(wallet)) return mem.profiles.get(wallet)!
   const r = await getRedis()
   if (r) {
-    const id = await r.get<string>(`profile:blobid:${wallet}`)
+    const id = await r.get(`profile:blobid:${wallet}`) as string | null
     if (id) mem.profiles.set(wallet, id)
     return id
   }
@@ -54,7 +56,7 @@ export async function getProfile(wallet: string): Promise<ProfilrProfile | null>
   if (mem.profileData.has(wallet)) return mem.profileData.get(wallet)!
   const r = await getRedis()
   if (r) {
-    const raw = await r.get<string>(`profile:${wallet}`)
+    const raw = await r.get(`profile:${wallet}`) as string | null
     if (!raw) return null
     const p = typeof raw === 'string' ? JSON.parse(raw) : raw as ProfilrProfile
     mem.profileData.set(wallet, p)
@@ -65,7 +67,7 @@ export async function getProfile(wallet: string): Promise<ProfilrProfile | null>
 
 export async function getAllProfileWallets(): Promise<string[]> {
   const r = await getRedis()
-  if (r) return r.smembers('profiles:all')
+  if (r) return r.smembers('profiles:all') as Promise<string[]>
   return Array.from(mem.profiles.keys())
 }
 
@@ -83,7 +85,7 @@ export async function getCredential(id: string): Promise<(Credential & { ownerWa
   if (mem.credentials.has(id)) return mem.credentials.get(id)!
   const r = await getRedis()
   if (r) {
-    const raw = await r.get<string>(`credential:${id}`)
+    const raw = await r.get(`credential:${id}`) as string | null
     if (!raw) return null
     return typeof raw === 'string' ? JSON.parse(raw) : raw
   }
@@ -92,7 +94,7 @@ export async function getCredential(id: string): Promise<(Credential & { ownerWa
 
 export async function getAllCredentialIds(): Promise<string[]> {
   const r = await getRedis()
-  if (r) return r.smembers('credentials:all')
+  if (r) return r.smembers('credentials:all') as Promise<string[]>
   return Array.from(mem.credentials.keys())
 }
 
@@ -112,8 +114,8 @@ export async function saveAccessRecord(record: AccessRecord & { ownerWallet: str
 export async function getAccessRecordsByOwner(ownerWallet: string): Promise<AccessRecord[]> {
   const r = await getRedis()
   if (r) {
-    const raw = await r.lrange(`access:owner:${ownerWallet}`, 0, 99)
-    return raw.map((x: any) => typeof x === 'string' ? JSON.parse(x) : x)
+    const raw = await r.lrange(`access:owner:${ownerWallet}`, 0, 99) as string[]
+    return raw.map(x => typeof x === 'string' ? JSON.parse(x) : x)
   }
   return mem.access.get(ownerWallet) ?? []
 }
@@ -121,26 +123,35 @@ export async function getAccessRecordsByOwner(ownerWallet: string): Promise<Acce
 export async function getAllAccessRecords(limit = 100): Promise<(AccessRecord & { ownerWallet?: string })[]> {
   const r = await getRedis()
   if (r) {
-    const raw = await r.lrange('access:all', 0, limit - 1)
-    return raw.map((x: any) => typeof x === 'string' ? JSON.parse(x) : x)
+    const raw = await r.lrange('access:all', 0, limit - 1) as string[]
+    return raw.map(x => typeof x === 'string' ? JSON.parse(x) : x)
   }
   return mem.accessAll.slice(0, limit)
 }
 
-export async function checkActiveAccess(profileBlobId: string, viewerWallet: string): Promise<{ hasAccess: boolean; expiresAt: number | null }> {
+export async function checkActiveAccess(profileBlobId: string, viewerWallet: string): Promise<{
+  hasAccess: boolean
+  expiresAt: number | null
+}> {
   const now = Date.now()
   for (const records of mem.access.values()) {
-    const found = records.find(r => r.viewerWallet === viewerWallet && r.profileBlobId === profileBlobId && r.expiresAt > now)
+    const found = records.find(
+      r => r.viewerWallet === viewerWallet && r.profileBlobId === profileBlobId && r.expiresAt > now
+    )
     if (found) return { hasAccess: true, expiresAt: found.expiresAt }
   }
   const r = await getRedis()
   if (r) {
-    const keys = await r.keys('access:owner:*')
+    const keys = await r.keys('access:owner:*') as string[]
     for (const key of keys) {
-      const raw = await r.lrange(key, 0, 99)
+      const raw = await r.lrange(key, 0, 99) as string[]
       for (const item of raw) {
         const rec = typeof item === 'string' ? JSON.parse(item) : item
-        if (rec.viewerWallet === viewerWallet && rec.profileBlobId === profileBlobId && rec.expiresAt > now) {
+        if (
+          rec.viewerWallet  === viewerWallet &&
+          rec.profileBlobId === profileBlobId &&
+          rec.expiresAt > now
+        ) {
           return { hasAccess: true, expiresAt: rec.expiresAt }
         }
       }
@@ -168,7 +179,7 @@ export async function isBanned(wallet: string): Promise<boolean> {
 }
 export async function getAllBanned(): Promise<Record<string, string>> {
   const r = await getRedis()
-  if (r) return (await r.hgetall('admin:banned')) ?? {}
+  if (r) return ((await r.hgetall('admin:banned')) ?? {}) as Record<string, string>
   return Object.fromEntries(mem.banned)
 }
 export async function flagWallet(wallet: string, reason: string) {
@@ -183,7 +194,7 @@ export async function unflagWallet(wallet: string) {
 }
 export async function getAllFlagged(): Promise<Record<string, string>> {
   const r = await getRedis()
-  if (r) return (await r.hgetall('admin:flagged')) ?? {}
+  if (r) return ((await r.hgetall('admin:flagged')) ?? {}) as Record<string, string>
   return Object.fromEntries(mem.flagged)
 }
 export async function incrementStat(field: string, amount = 1) {
@@ -194,8 +205,10 @@ export async function incrementStat(field: string, amount = 1) {
 export async function getPlatformStats(): Promise<Record<string, number>> {
   const r = await getRedis()
   if (r) {
-    const raw = await r.hgetall('admin:stats')
-    if (raw) return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, parseFloat(v as string) || 0]))
+    const raw = (await r.hgetall('admin:stats')) as Record<string, string> | null
+    if (raw) return Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [k, parseFloat(v) || 0])
+    )
   }
   return Object.fromEntries(mem.stats)
 }
