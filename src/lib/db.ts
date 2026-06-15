@@ -134,7 +134,7 @@ export async function checkActiveAccess(profileBlobId: string, viewerWallet: str
   expiresAt: number | null
 }> {
   const now = Date.now()
-  for (const records of mem.access.values()) {
+  for (const records of Array.from(mem.access.values())) {
     const found = records.find(
       r => r.viewerWallet === viewerWallet && r.profileBlobId === profileBlobId && r.expiresAt > now
     )
