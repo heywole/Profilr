@@ -1,10 +1,7 @@
 import type { ProfilrProfile, Credential, AccessRecord } from '@/types'
 
-// ── Safe Redis with in-memory fallback when Upstash not configured ──
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let redis: any = null
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getRedis(): Promise<any> {
   if (redis) return redis
   const url   = process.env.UPSTASH_REDIS_REST_URL
@@ -17,7 +14,6 @@ async function getRedis(): Promise<any> {
   return null
 }
 
-// ── In-memory fallback ──
 const mem = {
   profiles:    new Map<string, string>(),
   profileData: new Map<string, ProfilrProfile>(),
@@ -29,7 +25,6 @@ const mem = {
   stats:       new Map<string, number>(),
 }
 
-// ── Profiles ──
 export async function saveProfile(wallet: string, profile: ProfilrProfile, blobId: string) {
   mem.profiles.set(wallet, blobId)
   mem.profileData.set(wallet, profile)
@@ -71,7 +66,6 @@ export async function getAllProfileWallets(): Promise<string[]> {
   return Array.from(mem.profiles.keys())
 }
 
-// ── Credentials ──
 export async function saveCredential(credential: Credential & { ownerWallet: string }) {
   mem.credentials.set(credential.id, credential)
   const r = await getRedis()
@@ -98,7 +92,6 @@ export async function getAllCredentialIds(): Promise<string[]> {
   return Array.from(mem.credentials.keys())
 }
 
-// ── Access records ──
 export async function saveAccessRecord(record: AccessRecord & { ownerWallet: string; profileBlobId: string }) {
   const ownerList = mem.access.get(record.ownerWallet) ?? []
   ownerList.push(record)
@@ -129,15 +122,10 @@ export async function getAllAccessRecords(limit = 100): Promise<(AccessRecord & 
   return mem.accessAll.slice(0, limit)
 }
 
-export async function checkActiveAccess(profileBlobId: string, viewerWallet: string): Promise<{
-  hasAccess: boolean
-  expiresAt: number | null
-}> {
+export async function checkActiveAccess(profileBlobId: string, viewerWallet: string): Promise<{ hasAccess: boolean; expiresAt: number | null }> {
   const now = Date.now()
   for (const records of Array.from(mem.access.values())) {
-    const found = records.find(
-      r => r.viewerWallet === viewerWallet && r.profileBlobId === profileBlobId && r.expiresAt > now
-    )
+    const found = records.find(r => r.viewerWallet === viewerWallet && r.profileBlobId === profileBlobId && r.expiresAt > now)
     if (found) return { hasAccess: true, expiresAt: found.expiresAt }
   }
   const r = await getRedis()
@@ -147,11 +135,7 @@ export async function checkActiveAccess(profileBlobId: string, viewerWallet: str
       const raw = await r.lrange(key, 0, 99) as string[]
       for (const item of raw) {
         const rec = typeof item === 'string' ? JSON.parse(item) : item
-        if (
-          rec.viewerWallet  === viewerWallet &&
-          rec.profileBlobId === profileBlobId &&
-          rec.expiresAt > now
-        ) {
+        if (rec.viewerWallet === viewerWallet && rec.profileBlobId === profileBlobId && rec.expiresAt > now) {
           return { hasAccess: true, expiresAt: rec.expiresAt }
         }
       }
@@ -160,7 +144,6 @@ export async function checkActiveAccess(profileBlobId: string, viewerWallet: str
   return { hasAccess: false, expiresAt: null }
 }
 
-// ── Admin ──
 export async function banWallet(wallet: string, reason: string) {
   mem.banned.set(wallet, reason)
   const r = await getRedis()
@@ -206,9 +189,7 @@ export async function getPlatformStats(): Promise<Record<string, number>> {
   const r = await getRedis()
   if (r) {
     const raw = (await r.hgetall('admin:stats')) as Record<string, string> | null
-    if (raw) return Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [k, parseFloat(v) || 0])
-    )
+    if (raw) return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, parseFloat(v) || 0]))
   }
   return Object.fromEntries(mem.stats)
 }
