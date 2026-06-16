@@ -4,14 +4,15 @@ const BASE = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
 const KEY  = process.env.SHELBY_API_KEY ?? ''
 
 class ShelbyClient {
-  private auth = { Authorization: `Bearer ${KEY}` }
-
-  async uploadJson(data: object): Promise<ShelbyUploadResult> {
-    const body = JSON.stringify(data)
-    return this.upload(body, 'application/json')
+  private get auth() {
+    return { Authorization: `Bearer ${KEY}` }
   }
 
-  async upload(data: string | Uint8Array, contentType = 'application/octet-stream'): Promise<ShelbyUploadResult> {
+  async uploadJson(data: object): Promise<ShelbyUploadResult> {
+    return this.upload(JSON.stringify(data), 'application/json')
+  }
+
+  async upload(data: string, contentType = 'application/json'): Promise<ShelbyUploadResult> {
     const apiKey = process.env.SHELBY_API_KEY ?? ''
     const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
 
@@ -24,7 +25,7 @@ class ShelbyClient {
     const res = await fetch(`${apiUrl}/v1/blobs`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': contentType },
-      body: typeof data === 'string' ? data : new Blob([data]),
+      body: data,
     })
     if (!res.ok) throw new Error(`Shelby upload failed ${res.status}: ${await res.text()}`)
     const j = await res.json()
