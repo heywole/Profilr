@@ -19,6 +19,11 @@ export interface Credential {
   verifiedAt?: number
   verificationReason?: string
   createdAt: number
+  // File attachment (e.g. scanned certificate, diploma image, award PDF)
+  fileBlobId?: string
+  fileName?: string
+  fileType?: string
+  fileSize?: number
 }
 
 export interface ProfilrProfile {
