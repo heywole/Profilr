@@ -1,23 +1,24 @@
 import { NextResponse }  from 'next/server'
-import { shelby }        from '@/lib/shelby'
-import { getProfileBlobId, isBanned } from '@/lib/db'
-import type { ProfilrProfile } from '@/types'
+import { getProfile, isBanned } from '@/lib/db'
 
 export async function GET(_req: Request, { params }: { params: { wallet: string } }) {
   try {
     const { wallet } = params
 
-    // Check if banned
     if (await isBanned(wallet))
       return NextResponse.json({ error: 'Profile unavailable' }, { status: 403 })
 
-    const blobId = await getProfileBlobId(wallet)
-    if (!blobId)
+    // Read from our own database (Redis or memory) — NOT from Shelby directly.
+    // Shelby is only the source of truth once it's actually connected;
+    // until then, db.ts is what the app reads from for speed and reliability.
+    const profile = await getProfile(wallet)
+
+    if (!profile)
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    const profile = await shelby.downloadJson<ProfilrProfile>(blobId)
     return NextResponse.json({ profile })
-  } catch {
+  } catch (e) {
+    console.error('[profile/[wallet]]', e)
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 }

@@ -7,8 +7,11 @@ import {
   ShieldCheck, Users, FileText, DollarSign,
   Eye, AlertTriangle, Ban, Flag, CheckCircle,
   ExternalLink, RefreshCw, Search, ChevronDown, ChevronUp, Activity,
+  Sparkles, Trash2, Loader2,
 } from 'lucide-react'
 import { truncateAddress, formatUsdc, timeAgo, credLabel, credEmoji, daysLeft, isExpired } from '@/lib/utils'
+import { getRandomSample }        from '@/lib/sampleCredentials'
+import { generateCertificateFile } from '@/lib/generateCertificate'
 import type { ProfilrProfile, Credential, AccessRecord } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -34,11 +37,10 @@ interface AdminPayment extends AccessRecord {
 }
 
 export default function AdminPage() {
-  const { account, connected, isLoading } = useWallet() as ReturnType<typeof useWallet> & { isLoading?: boolean }
+  const { account, connected } = useWallet()
   const router                 = useRouter()
   const adminWallet            = process.env.NEXT_PUBLIC_ADMIN_WALLET ?? ''
 
-  // Wait for wallet adapter to finish attempting auto-reconnect before deciding access
   const [checking, setChecking] = useState(true)
 
   const [tab,         setTab]         = useState<Tab>('overview')
@@ -52,16 +54,15 @@ export default function AdminPage() {
   const [query,       setQuery]       = useState('')
   const [banTarget,   setBanTarget]   = useState('')
   const [banReason,   setBanReason]   = useState('')
+  const [generating,  setGenerating]  = useState(false)
 
-  // Give the wallet adapter time to auto-reconnect before checking access
   useEffect(() => {
     const timer = setTimeout(() => setChecking(false), 1200)
     return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
-    if (checking) return // still waiting for wallet to restore session
-
+    if (checking) return
     if (!connected) { router.push('/'); return }
     if (account?.address?.toString().toLowerCase() !== adminWallet.toLowerCase()) {
       router.push('/')
@@ -110,7 +111,55 @@ export default function AdminPage() {
     } catch { toast.error('Action failed') }
   }
 
-  // Still waiting for wallet adapter to restore session — show a loading state, not a redirect
+  const generateTestCredential = async () => {
+    if (!adminWallet) { toast.error('Admin wallet not configured'); return }
+    setGenerating(true)
+    try {
+      const sample = getRandomSample()
+
+      const res = await fetch('/api/credential/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...sample, walletAddress: adminWallet }),
+      })
+      if (!res.ok) throw new Error('Failed to generate credential')
+      const { credential } = await res.json()
+
+      const file = await generateCertificateFile({
+        title: sample.title,
+        institution: sample.institution,
+        recipientName: 'Admin',
+      })
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('credentialId', credential.id)
+      fd.append('walletAddress', adminWallet)
+      await fetch('/api/credential/upload-file', { method: 'POST', body: fd })
+
+      toast.success('Test credential generated with certificate')
+      fetchAll()
+    } catch {
+      toast.error('Failed to generate test credential')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const deleteCredentialAsAdmin = async (credentialId: string) => {
+    try {
+      const res = await fetch('/api/admin/credential/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({ credentialId }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Credential deleted')
+      fetchAll()
+    } catch {
+      toast.error('Failed to delete credential')
+    }
+  }
+
   if (checking) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -224,7 +273,12 @@ export default function AdminPage() {
                         {profiles.slice(0, 8).map(p => (
                           <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-dim)' }}>{truncateAddress(p.walletAddress)}</td>
-                            <td className="px-4 py-3 font-medium" style={{ color: 'var(--text)' }}>{p.displayName}</td>
+                            <td className="px-4 py-3 font-medium" style={{ color: 'var(--text)' }}>
+                              {p.displayName}
+                              {p.walletAddress?.toLowerCase() === adminWallet.toLowerCase() && (
+                                <span className="badge-pink text-[9px] ml-2">Admin</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3" style={{ color: 'var(--text-sub)' }}>{p.credentials.length}</td>
                             <td className="px-4 py-3">
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{
@@ -279,7 +333,12 @@ export default function AdminPage() {
                                   <span className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{p.displayName?.[0]?.toUpperCase()}</span>
                                 </div>
                                 <div>
-                                  <p className="font-semibold" style={{ color: 'var(--text)' }}>{p.displayName}</p>
+                                  <p className="font-semibold" style={{ color: 'var(--text)' }}>
+                                    {p.displayName}
+                                    {p.walletAddress?.toLowerCase() === adminWallet.toLowerCase() && (
+                                      <span className="badge-pink text-[9px] ml-2">Admin</span>
+                                    )}
+                                  </p>
                                   <p className="text-xs font-mono" style={{ color: 'var(--text-dim)' }}>{truncateAddress(p.walletAddress)}</p>
                                 </div>
                               </div>
@@ -349,13 +408,19 @@ export default function AdminPage() {
                     <input className="input pl-9" placeholder="Search title, institution or wallet…" value={query} onChange={e => setQuery(e.target.value)}/>
                   </div>
                   <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{filteredCreds.length} credentials</p>
+                  <button onClick={generateTestCredential} disabled={generating} className="btn-primary text-xs h-9 ml-auto">
+                    {generating
+                      ? <><Loader2 size={13} className="animate-spin"/>Generating…</>
+                      : <><Sparkles size={13}/>Generate test credential</>
+                    }
+                  </button>
                 </div>
 
                 <div className="card overflow-hidden">
                   <table className="w-full text-sm">
                     <thead style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
                       <tr>
-                        {['Credential','Owner','Type','Status','Submitted','Blob ID'].map(h => (
+                        {['Credential','Owner','Type','Status','Submitted','Blob ID','Actions'].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-dim)' }}>{h}</th>
                         ))}
                       </tr>
@@ -372,7 +437,12 @@ export default function AdminPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-dim)' }}>{truncateAddress(c.ownerWallet)}</td>
+                          <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-dim)' }}>
+                            {truncateAddress(c.ownerWallet)}
+                            {c.ownerWallet?.toLowerCase() === adminWallet.toLowerCase() && (
+                              <span className="badge-pink text-[9px] ml-1.5">Admin</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-xs capitalize" style={{ color: 'var(--text-sub)' }}>{credLabel(c.type)}</td>
                           <td className="px-4 py-3">
                             {c.verificationStatus === 'verified' && <span className="badge-verified text-[10px]"><ShieldCheck size={9}/>Verified</span>}
@@ -381,6 +451,13 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-dim)' }}>{timeAgo(c.createdAt)}</td>
                           <td className="px-4 py-3 font-mono text-xs max-w-[120px] truncate" style={{ color: 'var(--text-dim)' }}>{c.blobId || '—'}</td>
+                          <td className="px-4 py-3">
+                            {c.ownerWallet?.toLowerCase() === adminWallet.toLowerCase() && (
+                              <button onClick={() => deleteCredentialAsAdmin(c.id)} className="btn-icon w-7 h-7 text-red-500">
+                                <Trash2 size={12}/>
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

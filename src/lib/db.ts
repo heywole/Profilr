@@ -92,6 +92,15 @@ export async function getAllCredentialIds(): Promise<string[]> {
   return Array.from(mem.credentials.keys())
 }
 
+export async function deleteCredential(id: string) {
+  mem.credentials.delete(id)
+  const r = await getRedis()
+  if (r) {
+    await r.del(`credential:${id}`)
+    await r.srem('credentials:all', id)
+  }
+}
+
 export async function saveAccessRecord(record: AccessRecord & { ownerWallet: string; profileBlobId: string }) {
   const ownerList = mem.access.get(record.ownerWallet) ?? []
   ownerList.push(record)
