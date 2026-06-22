@@ -37,7 +37,14 @@ class Profilr(gl.Contract):
         cred_title = title
         cred_inst  = institution
 
-        def nondet() -> typing.Any:
+        # IMPORTANT: this nondet block returns ONLY a single word.
+        # Free-text reasoning was removed from the consensus path because
+        # strict_eq requires byte-for-byte identical output across all
+        # validators — and five separate LLM calls will never phrase
+        # the same sentence the exact same way, even when they agree.
+        # Narrowing the output to one of three fixed words makes
+        # consensus realistic.
+        def nondet() -> str:
             task = f"""
 You are a professional credential verification specialist.
 
@@ -46,51 +53,47 @@ Credential to verify:
 - Title: {cred_title}
 - Institution or Company: {cred_inst}
 
-Your task:
-1. Confirm '{cred_inst}' is a real, legitimate institution or company.
-2. Check if a '{cred_title}' credential from '{cred_inst}' is plausible.
-3. Flag red flags: misspellings, non-existent institutions, implausible claims.
+Confirm whether '{cred_inst}' is a real, legitimate institution or
+company, and whether a '{cred_title}' credential from it is plausible.
 
-Respond with the following JSON format:
-{{
-    "verdict": str,   // exactly one of: "VERIFIED", "REVIEWING", or "FAILED"
-    "reasoning": str  // one sentence explanation
-}}
-It is mandatory that you respond only using the JSON format above, nothing else.
-Don't include any other words or characters, your output must be only JSON without any formatting prefix or suffix.
-This result should be perfectly parsable by a JSON parser without errors.
+Respond with EXACTLY ONE WORD, nothing else, no punctuation, no explanation:
+VERIFIED
+REVIEWING
+FAILED
             """
-            result = gl.nondet.exec_prompt(task).replace("```json", "").replace("```", "")
-            parsed = json.loads(result)
-            v = str(parsed.get("verdict", "REVIEWING")).upper()
-            if v not in ("VERIFIED", "REVIEWING", "FAILED"):
-                v = "REVIEWING"
-            r = str(parsed.get("reasoning", "No reasoning provided."))
-            return json.dumps({"verdict": v, "reasoning": r}, sort_keys=True)
+            result = gl.nondet.exec_prompt(task).strip().upper()
+            # Defensive cleanup in case the model adds stray characters
+            for word in ("VERIFIED", "REVIEWING", "FAILED"):
+                if word in result:
+                    return word
+            return "REVIEWING"
 
-        raw    = gl.eq_principle.strict_eq(nondet)
-        parsed = json.loads(raw)
+        verdict = gl.eq_principle.strict_eq(nondet)
+
+        # Reasoning is generated AFTER consensus is reached, by the
+        # leader only, as a simple templated explanation — not part
+        # of the consensus-critical path.
+        reasoning = f"GenLayer validator consensus: institution and credential type were evaluated as {verdict}."
 
         self.verdicts[credential_blob_id] = json.dumps({
-            "verdict":     parsed["verdict"],
-            "reasoning":   parsed["reasoning"],
+            "verdict":     verdict,
+            "reasoning":   reasoning,
             "timestamp":   gl.message.timestamp,
             "type":        credential_type,
             "title":       title,
             "institution": institution,
         })
 
-        # update reputation
         existing_rep = self.reputations.get(owner_wallet)
         if existing_rep is None:
             rep = {"score": 100, "verified": 0, "failed": 0}
         else:
             rep = json.loads(existing_rep)
 
-        if parsed["verdict"] == "VERIFIED":
+        if verdict == "VERIFIED":
             rep["verified"] += 1
             rep["score"]     = min(100, rep["score"] + 2)
-        elif parsed["verdict"] == "FAILED":
+        elif verdict == "FAILED":
             rep["failed"] += 1
             rep["score"]    = max(0, rep["score"] - 10)
 
