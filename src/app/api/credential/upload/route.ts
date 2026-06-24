@@ -13,19 +13,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Title and institution are required' }, { status: 400 })
 
     const credential: Credential = {
-      id: uuid(),
-      type: type ?? 'education',
-      title: title.trim(),
-      institution: institution.trim(),
-      description: (description ?? '').trim(),
-      startDate: startDate ?? '',
-      endDate: endDate ?? '',
-      current: !!current,
-      credentialUrl: credentialUrl ?? '',
-      blobId: '',
-      merkleRoot: '',
+      id:                 uuid(),
+      type:               type ?? 'education',
+      title:              title.trim(),
+      institution:        institution.trim(),
+      description:        (description ?? '').trim(),
+      startDate:          startDate ?? '',
+      endDate:            endDate ?? '',
+      current:            !!current,
+      credentialUrl:      credentialUrl ?? '',
+      blobId:             '',
+      merkleRoot:         '',
       verificationStatus: 'pending',
-      createdAt: Date.now(),
+      createdAt:          Date.now(),
     }
 
     const { blobId, merkleRoot } = await shelby.uploadJson(credential)
@@ -35,13 +35,37 @@ export async function POST(req: Request) {
     await saveCredential({ ...credential, ownerWallet: walletAddress })
     await incrementStat('total_credentials')
 
-    const profile = await getProfile(walletAddress)
-    if (profile) {
-      profile.credentials.push(credential)
-      profile.updatedAt = Date.now()
-      const { blobId: newBlobId } = await shelby.uploadJson(profile)
-      await saveProfile(walletAddress, profile, newBlobId)
+    // Get existing profile — or create a minimal one so credentials always attach
+    let profile = await getProfile(walletAddress)
+
+    if (!profile) {
+      // Auto-create a minimal profile so credentials are always visible
+      profile = {
+        id:            uuid(),
+        walletAddress,
+        displayName:   walletAddress.slice(0, 8) + '…' + walletAddress.slice(-4),
+        title:         '',
+        bio:           '',
+        location:      '',
+        website:       '',
+        accessMode:    'free',
+        accessFeeUsdc: 2,
+        profileBlobId: '',
+        totalViews:    0,
+        totalEarnings: 0,
+        credentials:   [],
+        createdAt:     Date.now(),
+        updatedAt:     Date.now(),
+      }
+      await incrementStat('total_profiles')
     }
+
+    profile.credentials.push(credential)
+    profile.updatedAt = Date.now()
+
+    const { blobId: newBlobId } = await shelby.uploadJson(profile)
+    profile.profileBlobId = newBlobId
+    await saveProfile(walletAddress, profile, newBlobId)
 
     return NextResponse.json({ credential })
   } catch (e) {

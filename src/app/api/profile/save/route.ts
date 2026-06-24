@@ -18,10 +18,10 @@ export async function POST(req: Request) {
       id:            existing?.id            ?? uuid(),
       walletAddress,
       displayName:   displayName.trim(),
-      title:         (title ?? '').trim(),
-      bio:           (bio ?? '').trim(),
+      title:         (title    ?? '').trim(),
+      bio:           (bio      ?? '').trim(),
       location:      (location ?? '').trim(),
-      website:       (website ?? '').trim(),
+      website:       (website  ?? '').trim(),
       accessMode:    accessMode    ?? 'free',
       accessFeeUsdc: Number(accessFeeUsdc) || 2,
       profileBlobId: existing?.profileBlobId ?? '',
@@ -32,10 +32,8 @@ export async function POST(req: Request) {
       updatedAt:     Date.now(),
     }
 
-    // shelby.uploadJson never throws now — always returns a blobId (real or local fallback)
     const { blobId } = await shelby.uploadJson(profile)
     profile.profileBlobId = blobId
-
     await saveProfile(walletAddress, profile, blobId)
 
     return NextResponse.json({ profile })
