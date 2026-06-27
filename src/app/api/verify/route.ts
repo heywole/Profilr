@@ -1,26 +1,8 @@
 import { NextResponse }    from 'next/server'
 import { genLayer }        from '@/lib/genlayer'
-import { getProfile, saveProfile } from '@/lib/db'
+import { getProfile, saveProfile, getCredential, saveCredential } from '@/lib/db'
+import { shelby }          from '@/lib/shelby'
 import type { Credential } from '@/types'
-
-async function downloadFromShelby(blobId: string): Promise<Credential | null> {
-  const apiKey = process.env.SHELBY_API_KEY
-  const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
-
-  if (!apiKey || apiKey === 'your_shelby_api_key_here') {
-    return null
-  }
-
-  try {
-    const res = await fetch(`${apiUrl}/v1/blobs/${blobId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-    })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
-  }
-}
 
 export async function POST(req: Request) {
   try {
@@ -29,51 +11,43 @@ export async function POST(req: Request) {
     if (!credentialId || !blobId)
       return NextResponse.json({ error: 'credentialId and blobId required' }, { status: 400 })
 
-    // Submit to GenLayer for AI verification
-    let txHash: unknown = null
+    // Submit to GenLayer
+    let txHash: string | null = null
     try {
-      const credential = await downloadFromShelby(blobId)
-      if (credential) {
+      const cred = await getCredential(credentialId)
+      if (cred) {
         txHash = await genLayer.verifyCredential({
           credentialBlobId: blobId,
-          type:             credential.type,
-          title:            credential.title,
-          institution:      credential.institution,
-          ownerWallet:      walletAddress ?? '',
-        })
+          type:             cred.type,
+          title:            cred.title,
+          institution:      cred.institution,
+          ownerWallet:      walletAddress ?? cred.ownerWallet ?? '',
+        }) as string
       }
     } catch (e) {
-      console.warn('[verify] GenLayer not configured:', e)
+      console.warn('[verify] GenLayer call failed:', e)
     }
 
-    // Update credential status to reviewing in the profile
+    // Update credential status to 'reviewing' + store tx hash
+    const updateCredential = async (c: Credential & { ownerWallet: string }) => {
+      c.verificationStatus = 'reviewing'
+      if (txHash) c.verificationBlobId = txHash
+      await saveCredential(c)
+    }
+
+    const existingCred = await getCredential(credentialId)
+    if (existingCred) await updateCredential(existingCred)
+
+    // Update inside profile credentials array
     if (walletAddress) {
       const profile = await getProfile(walletAddress)
       if (profile) {
         const idx = profile.credentials.findIndex(c => c.id === credentialId)
         if (idx >= 0) {
           profile.credentials[idx].verificationStatus = 'reviewing'
+          if (txHash) profile.credentials[idx].verificationBlobId = txHash
           profile.updatedAt = Date.now()
-
-          // Upload updated profile
-          const apiKey = process.env.SHELBY_API_KEY
-          const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
-          let newBlobId = profile.profileBlobId
-
-          if (apiKey && apiKey !== 'your_shelby_api_key_here') {
-            try {
-              const res = await fetch(`${apiUrl}/v1/blobs`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(profile),
-              })
-              if (res.ok) {
-                const j = await res.json()
-                newBlobId = j.blob_id ?? j.id
-              }
-            } catch {}
-          }
-
+          const { blobId: newBlobId } = await shelby.uploadJson(profile)
           await saveProfile(walletAddress, profile, newBlobId)
         }
       }
@@ -91,7 +65,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const blobId = searchParams.get('blobId')
     if (!blobId) return NextResponse.json({ error: 'blobId required' }, { status: 400 })
-
     const verdict = await genLayer.getVerdict(blobId)
     return NextResponse.json({ verdict })
   } catch {
