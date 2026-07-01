@@ -1,18 +1,11 @@
 import type { ShelbyUploadResult } from '@/types'
 
-const BASE = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
+const BASE = process.env.SHELBY_API_URL ?? 'https://api.shelbynet.shelby.xyz'
 const KEY  = process.env.SHELBY_API_KEY ?? ''
 
-/**
- * Uploads to Shelby. If Shelby is unreachable, unauthorized, or not
- * configured correctly, this NEVER throws — it always falls back to a
- * local placeholder blob so the rest of the app keeps working.
- * This is intentional: we don't yet have confirmed Shelby API docs,
- * so we treat any failure as "not available yet" rather than crashing.
- */
 async function safeUpload(data: string, contentType = 'application/json'): Promise<ShelbyUploadResult> {
   const apiKey = process.env.SHELBY_API_KEY ?? ''
-  const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelby.xyz'
+  const apiUrl = process.env.SHELBY_API_URL ?? 'https://api.shelbynet.shelby.xyz'
 
   const fallback = async (): Promise<ShelbyUploadResult> => {
     const { v4: uuid } = await import('uuid')
@@ -24,27 +17,31 @@ async function safeUpload(data: string, contentType = 'application/json'): Promi
     return fallback()
   }
 
+  // Try /v1/blobs endpoint first
   try {
     const res = await fetch(`${apiUrl}/v1/blobs`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': contentType },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': contentType,
+      },
       body: data,
     })
 
-    if (!res.ok) {
-      console.warn(`[Shelby] upload returned ${res.status} — falling back to local blob`)
-      return fallback()
+    if (res.ok) {
+      const j = await res.json()
+      return {
+        blobId:     j.blob_id ?? j.id ?? j.blobId,
+        merkleRoot: j.merkle_root ?? j.merkleRoot ?? '',
+        size:       j.size ?? data.length,
+        url:        `${apiUrl}/v1/blobs/${j.blob_id ?? j.id ?? j.blobId}`,
+      }
     }
 
-    const j = await res.json()
-    return {
-      blobId:     j.blob_id ?? j.id,
-      merkleRoot: j.merkle_root ?? j.merkleRoot ?? '',
-      size:       j.size ?? 0,
-      url:        `${apiUrl}/v1/blobs/${j.blob_id ?? j.id}`,
-    }
+    console.warn(`[Shelby] upload returned ${res.status} — ${await res.text()}`)
+    return fallback()
   } catch (e) {
-    console.warn('[Shelby] upload failed — falling back to local blob:', e)
+    console.warn('[Shelby] upload failed:', e)
     return fallback()
   }
 }
@@ -58,13 +55,12 @@ class ShelbyClient {
     return safeUpload(JSON.stringify(data), 'application/json')
   }
 
-  /** Upload a file as base64 text — works around binary body type issues */
   async uploadFileBase64(base64: string, mimeType: string): Promise<ShelbyUploadResult> {
     return safeUpload(JSON.stringify({ base64, mimeType }), 'application/json')
   }
 
   async downloadJson<T = unknown>(blobId: string): Promise<T> {
-    if (blobId.startsWith('local_')) throw new Error('Local blob — Shelby not configured yet')
+    if (blobId.startsWith('local_')) throw new Error('Local blob — Shelby not configured')
     const res = await fetch(`${BASE}/v1/blobs/${blobId}`, { headers: this.auth })
     if (!res.ok) throw new Error(`Shelby download failed ${res.status}`)
     return res.json() as Promise<T>
